@@ -1,0 +1,1728 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Tablero de Ajedrez - Movimientos de Peones</title>
+        <meta charset="UTF-8">
+        
+        <style>
+            .container {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                font-family: Arial, sans-serif;
+            }
+            .chess-board { 
+                border-spacing: 0; 
+                border-collapse: collapse; 
+                margin-bottom: 20px;
+            }
+            .chess-board th { padding: .5em; }
+            .chess-board th + th { border-bottom: 1px solid #000; }
+            .chess-board th:first-child,
+            .chess-board td:last-child { border-right: 1px solid #000; }
+            .chess-board tr:last-child td { border-bottom: 1px solid; }
+            .chess-board th:empty { border: none; }
+            .chess-board td { 
+                width: 60px; 
+                height: 60px; 
+                text-align: center; 
+                font-size: 40px; 
+                line-height: 0;
+                position: relative;
+            }
+            .chess-board .light { background: #eee; }
+            .chess-board .dark { background: #aaa; }
+            
+            .piece {
+                cursor: pointer;
+                user-select: none;
+            }
+            
+            .valid-move {
+                position: absolute;
+                width: 20px;
+                height: 20px;
+                background-color: rgba(0, 128, 0, 0.5);
+                border-radius: 50%;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                display: none;
+                pointer-events: none;
+            }
+            
+            .capture-move {
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                border: 4px solid rgba(255, 0, 0, 0.5);
+                box-sizing: border-box;
+                top: 0;
+                left: 0;
+                display: none;
+                pointer-events: none;
+            }
+            
+            .controls {
+                margin-top: 20px;
+                display: flex;
+                gap: 10px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
+            button {
+                padding: 8px 16px;
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 16px;
+            }
+            
+            button:hover {
+                background-color: #45a049;
+            }
+            
+            .status {
+                margin-top: 15px;
+                font-size: 18px;
+                height: 24px;
+            }
+            
+            .instructions {
+                max-width: 600px;
+                margin: 20px auto;
+                text-align: left;
+                line-height: 1.5;
+            }
+            
+            /* Estilos para la promoción */
+            .promotion-modal {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.5);
+                justify-content: center;
+                align-items: center;
+                z-index: 1000;
+            }
+            
+            .promotion-content {
+                background-color: white;
+                padding: 20px;
+                border-radius: 8px;
+                text-align: center;
+            }
+            
+            .promotion-options {
+                display: flex;
+                justify-content: center;
+                gap: 20px;
+                margin-top: 20px;
+            }
+            
+            .promotion-option {
+                cursor: pointer;
+                font-size: 48px;
+                width: 60px;
+                height: 60px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+            }
+            
+            .promotion-option:hover {
+                background-color: #f0f0f0;
+            }
+
+            /* Estilo para rey en jaque */
+            .king-in-check {
+                background-color: rgba(255, 0, 0, 0.4) !important;
+            }
+
+            /* Estilo para el texto de jaque mate */
+            .status.checkmate {
+                font-weight: bold;
+                font-size: 22px;
+                color: red;
+                animation: pulse 1.5s infinite;
+            }
+
+            @keyframes pulse {
+                0% { opacity: 0.7; }
+                50% { opacity: 1; }
+                100% { opacity: 0.7; }
+            }
+            
+            /* Indicador de última jugada */
+            .last-move {
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(255, 255, 0, 0.3);
+                top: 0;
+                left: 0;
+                pointer-events: none;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1> Ajedrez</h1>
+            
+            <div class="instructions">
+                <p><strong>Instrucciones:</strong></p>
+                <ul>
+                    <li>Solo disfruta la vibra muchachos</li>
+                    <li>La vida es una, juega y diviertete</li>
+                </ul>
+            </div>
+            
+            <table class="chess-board" id="chessboard">
+                <tbody>
+                    <tr>
+                        <th></th>
+                        <th>a</th>
+                        <th>b</th>
+                        <th>c</th>
+                        <th>d</th>
+                        <th>e</th>
+                        <th>f</th>
+                        <th>g</th>
+                        <th>h</th>
+                    </tr>
+                    <!-- Fila 8 (piezas negras) -->
+                    <tr>
+                        <th>8</th>
+                        <td class="light" id="a8">
+                            <span class="piece" data-piece="black-rook">♜</span>
+                            <div class="valid-move"></div>
+                            <div class="capture-move"></div>
+                        </td>
+                        <td class="dark" id="b8">
+                            <span class="piece" data-piece="black-knight">♞</span>
+                            <div class="valid-move"></div>
+                            <div class="capture-move"></div>
+                        </td>
+                        <td class="light" id="c8">
+                            <span class="piece" data-piece="black-bishop">♝</span>
+                            <div class="valid-move"></div>
+                            <div class="capture-move"></div>
+                        </td>
+                        <td class="dark" id="d8">
+                            <span class="piece" data-piece="black-queen">♛</span>
+                            <div class="valid-move"></div>
+                            <div class="capture-move"></div>
+                        </td>
+                        <td class="light" id="e8">
+                            <span class="piece" data-piece="black-king">♚</span>
+                            <div class="valid-move"></div>
+                            <div class="capture-move"></div>
+                        </td>
+                        <td class="dark" id="f8">
+                            <span class="piece" data-piece="black-bishop">♝</span>
+                            <div class="valid-move"></div>
+                            <div class="capture-move"></div>
+                        </td>
+                        <td class="light" id="g8">
+                            <span class="piece" data-piece="black-knight">♞</span>
+                            <div class="valid-move"></div>
+                            <div class="capture-move"></div>
+                        </td>
+                        <td class="dark" id="h8">
+                            <span class="piece" data-piece="black-rook">♜</span>
+                            <div class="valid-move"></div>
+                            <div class="capture-move"></div>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th>7</th>
+                        <td class="dark" id="a7"><span class="piece" data-piece="black-pawn">♟</span><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="light" id="b7"><span class="piece" data-piece="black-pawn">♟</span><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="dark" id="c7"><span class="piece" data-piece="black-pawn">♟</span><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="light" id="d7"><span class="piece" data-piece="black-pawn">♟</span><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="dark" id="e7"><span class="piece" data-piece="black-pawn">♟</span><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="light" id="f7"><span class="piece" data-piece="black-pawn">♟</span><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="dark" id="g7"><span class="piece" data-piece="black-pawn">♟</span><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="light" id="h7"><span class="piece" data-piece="black-pawn">♟</span><div class="valid-move"></div><div class="capture-move"></div></td>
+                    </tr>
+                    <tr>
+                        <th>6</th>
+                        <td class="light" id="a6"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="dark" id="b6"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="light" id="c6"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="dark" id="d6"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="light" id="e6"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="dark" id="f6"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="light" id="g6"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="dark" id="h6"><div class="valid-move"></div><div class="capture-move"></div></td>
+                    </tr>
+                    <tr>
+                        <th>5</th>
+                        <td class="dark" id="a5"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="light" id="b5"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="dark" id="c5"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="light" id="d5"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="dark" id="e5"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="light" id="f5"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="dark" id="g5"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="light" id="h5"><div class="valid-move"></div><div class="capture-move"></div></td>
+                    </tr>
+                    <tr>
+                        <th>4</th>
+                        <td class="light" id="a4"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="dark" id="b4"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="light" id="c4"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="dark" id="d4"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="light" id="e4"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="dark" id="f4"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="light" id="g4"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="dark" id="h4"><div class="valid-move"></div><div class="capture-move"></div></td>
+                    </tr>
+                    <tr>
+                        <th>3</th>
+                        <td class="dark" id="a3"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="light" id="b3"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="dark" id="c3"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="light" id="d3"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="dark" id="e3"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="light" id="f3"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="dark" id="g3"><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="light" id="h3"><div class="valid-move"></div><div class="capture-move"></div></td>
+                    </tr>
+                    <tr>
+                        <th>2</th>
+                        <td class="light" id="a2"><span class="piece" data-piece="white-pawn">♙</span><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="dark" id="b2"><span class="piece" data-piece="white-pawn">♙</span><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="light" id="c2"><span class="piece" data-piece="white-pawn">♙</span><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="dark" id="d2"><span class="piece" data-piece="white-pawn">♙</span><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="light" id="e2"><span class="piece" data-piece="white-pawn">♙</span><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="dark" id="f2"><span class="piece" data-piece="white-pawn">♙</span><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="light" id="g2"><span class="piece" data-piece="white-pawn">♙</span><div class="valid-move"></div><div class="capture-move"></div></td>
+                        <td class="dark" id="h2"><span class="piece" data-piece="white-pawn">♙</span><div class="valid-move"></div><div class="capture-move"></div></td>
+                    </tr>
+                    <tr>
+                    <th>1</th>
+                    <td class="dark" id="a1">
+                        <span class="piece" data-piece="white-rook">♖</span>
+                        <div class="valid-move"></div>
+                        <div class="capture-move"></div>
+                    </td>
+                    <td class="light" id="b1">
+                        <span class="piece" data-piece="white-knight">♘</span>
+                        <div class="valid-move"></div>
+                        <div class="capture-move"></div>
+                    </td>
+                    <td class="dark" id="c1">
+                        <span class="piece" data-piece="white-bishop">♗</span>
+                        <div class="valid-move"></div>
+                        <div class="capture-move"></div>
+                    </td>
+                    <td class="light" id="d1">
+                        <span class="piece" data-piece="white-queen">♕</span>
+                        <div class="valid-move"></div>
+                        <div class="capture-move"></div>
+                    </td>
+                    <td class="dark" id="e1">
+                        <span class="piece" data-piece="white-king">♔</span>
+                        <div class="valid-move"></div>
+                        <div class="capture-move"></div>
+                    </td>
+                    <td class="light" id="f1">
+                        <span class="piece" data-piece="white-bishop">♗</span>
+                        <div class="valid-move"></div>
+                        <div class="capture-move"></div>
+                    </td>
+                    <td class="dark" id="g1">
+                        <span class="piece" data-piece="white-knight">♘</span>
+                        <div class="valid-move"></div>
+                        <div class="capture-move"></div>
+                    </td>
+                    <td class="light" id="h1">
+                        <span class="piece" data-piece="white-rook">♖</span>
+                        <div class="valid-move"></div>
+                        <div class="capture-move"></div>
+                    </td>
+                </tr>
+
+                </tbody>
+            </table>
+            
+            <div class="status" id="status"></div>
+            
+            <div class="controls">
+                <button id="reset">Reiniciar Tablero</button>
+                <button id="toggle-turn">Cambiar Turno</button>
+            </div>
+        </div>
+        
+        <!-- Modal de promoción -->
+        <div class="promotion-modal" id="promotion-modal">
+            <div class="promotion-content">
+                <h2>Elige una pieza para promocionar</h2>
+                <div class="promotion-options" id="promotion-options">
+                    <!-- Las opciones se agregarán dinámicamente -->
+                </div>
+            </div>
+        </div>
+
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                // Estado del juego
+                const gameState = {
+                    selectedPiece: null,
+                    currentTurn: 'white', // Comienza con blancas
+                    board: {},
+                    initialSetup: true,
+                    lastMove: null, // Para seguimiento del último movimiento
+                    pendingPromotion: null, // Para promoción de peones
+                    enPassantTarget: null, // Para captura al paso
+                    gameOver: false // Nuevo estado para indicar si el juego ha terminado
+                };
+                
+                // Inicializar el tablero
+                initBoard();
+                
+                // Agregar eventos a las celdas (esto maneja tanto piezas como movimientos)
+                document.querySelectorAll('td').forEach(cell => {
+                    cell.addEventListener('click', handleCellClick);
+                });
+                
+                document.getElementById('reset').addEventListener('click', resetBoard);
+                document.getElementById('toggle-turn').addEventListener('click', toggleTurn);
+                
+                updateStatus();
+                
+                // Funciones
+                function initBoard() {
+                    gameState.board = {};
+                    
+                    // Peones
+                    for (let file of 'abcdefgh') {
+                        gameState.board[`${file}2`] = { type: 'pawn', color: 'white', hasMoved: false };
+                        gameState.board[`${file}7`] = { type: 'pawn', color: 'black', hasMoved: false };
+                    }
+                    
+                    // Torres
+                    gameState.board['a1'] = { type: 'rook', color: 'white', hasMoved: false };
+                    gameState.board['h1'] = { type: 'rook', color: 'white', hasMoved: false };
+                    gameState.board['a8'] = { type: 'rook', color: 'black', hasMoved: false };
+                    gameState.board['h8'] = { type: 'rook', color: 'black', hasMoved: false };
+                    
+                    // Caballos
+                    gameState.board['b1'] = { type: 'knight', color: 'white', hasMoved: false };
+                    gameState.board['g1'] = { type: 'knight', color: 'white', hasMoved: false };
+                    gameState.board['b8'] = { type: 'knight', color: 'black', hasMoved: false };
+                    gameState.board['g8'] = { type: 'knight', color: 'black', hasMoved: false };
+                    
+                    // Alfiles
+                    gameState.board['c1'] = { type: 'bishop', color: 'white', hasMoved: false };
+                    gameState.board['f1'] = { type: 'bishop', color: 'white', hasMoved: false };
+                    gameState.board['c8'] = { type: 'bishop', color: 'black', hasMoved: false };
+                    gameState.board['f8'] = { type: 'bishop', color: 'black', hasMoved: false };
+                    
+                    // Damas
+                    gameState.board['d1'] = { type: 'queen', color: 'white', hasMoved: false };
+                    gameState.board['d8'] = { type: 'queen', color: 'black', hasMoved: false };
+                    
+                    // Reyes
+                    gameState.board['e1'] = { type: 'king', color: 'white', hasMoved: false };
+                    gameState.board['e8'] = { type: 'king', color: 'black', hasMoved: false };
+                }
+                
+      // Reemplazar la función handleCellClick actual con esta versión mejorada
+function handleCellClick(event) {
+    // Si hay una promoción pendiente, no permitir ningún movimiento
+    if (gameState.pendingPromotion) return;
+    
+    // Manejo de clics en celdas del tablero
+    const targetCell = event.currentTarget;
+    const position = targetCell.id;
+    
+    // Verifica si hay una pieza seleccionada previamente
+    if (gameState.selectedPiece) {
+        // Ya hay una pieza seleccionada, intentamos mover o capturar
+        const targetPosition = position;
+        
+        // Verificar si el movimiento es válido (considerando jaque)
+        const validMoves = getValidMovesConsideringCheck(gameState.selectedPiece);
+        
+        if (validMoves.regular.includes(targetPosition) || 
+            validMoves.captures.includes(targetPosition) || 
+            validMoves.enPassant === targetPosition) {                 
+            // Verificar si es un movimiento de captura al paso
+            if (validMoves.enPassant === targetPosition) {
+                executeEnPassantCapture(gameState.selectedPiece, targetPosition);
+            } else {
+                // Mover la pieza
+                movePiece(gameState.selectedPiece, targetPosition);
+            }
+            
+            // Limpiar selección y resaltados
+            gameState.selectedPiece = null;
+            clearHighlights();
+            
+            // Actualizar captura al paso después de la jugada
+            updateEnPassantTarget(targetPosition);
+            
+            // Actualizar visualización de última jugada
+            updateLastMoveHighlight(targetPosition);
+            
+            // Cambiar turno si no hay promoción pendiente
+            if (!gameState.pendingPromotion) {
+                gameState.currentTurn = gameState.currentTurn === 'white' ? 'black' : 'white';
+                
+                // Verificar jaque o jaque mate después del cambio de turno
+                checkForCheckOrCheckmateStatus();
+            }
+        } else {
+            // Si el clic es en una pieza del mismo color, la seleccionamos en su lugar
+            const pieceData = gameState.board[position];
+            if (pieceData && pieceData.color === gameState.currentTurn) {
+                // Limpiar movimientos anteriores
+                clearHighlights();
+                
+                // Seleccionar nueva pieza
+                gameState.selectedPiece = position;
+                
+                // Resaltar movimientos válidos
+                highlightValidMoves(position);
+            } else {
+                // Clic en un lugar inválido, deseleccionamos la pieza
+                gameState.selectedPiece = null;
+                clearHighlights();
+            }
+        }
+    } else {
+        // No hay pieza seleccionada, intentamos seleccionar una
+        const pieceData = gameState.board[position];
+        
+        // Si no hay pieza en esa posición o no es el turno de esa pieza, salir
+        if (!pieceData || pieceData.color !== gameState.currentTurn) {
+            return;
+        }
+        
+        // Limpiar movimientos anteriores
+        clearHighlights();
+        
+        // Seleccionar pieza
+        gameState.selectedPiece = position;
+        
+        // Resaltar movimientos válidos (considerando jaque)
+        highlightValidMoves(position);
+    }
+}
+                
+                function getValidMoves(position) {
+    const piece = gameState.board[position];
+    // Siempre devolvemos este formato
+    const moves = { regular: [], captures: [], enPassant: null };
+    if (!piece) return moves;
+
+    // --- LÓGICA PARA PEONES ---
+    if (piece.type === 'pawn') {
+        const [file, rank] = position.split('');
+        const fileIndex = file.charCodeAt(0) - 97; 
+        const rankNum   = parseInt(rank, 10);
+        const dir       = piece.color === 'white' ? 1 : -1;
+
+        // Avance uno
+        const oneStep = `${file}${rankNum + dir}`;
+        if (isValidPosition(oneStep) && !isPieceAt(oneStep)) {
+            moves.regular.push(oneStep);
+
+            // Avance dos desde inicial
+            const twoStep = `${file}${rankNum + 2 * dir}`;
+            if (!piece.hasMoved && isValidPosition(twoStep) && !isPieceAt(twoStep)) {
+                moves.regular.push(twoStep);
+            }
+        }
+
+        // Capturas diagonales y en‑passant
+        for (let df of [-1, +1]) {
+            const f = fileIndex + df;
+            const r = rankNum + dir;
+            const target = `${String.fromCharCode(97 + f)}${r}`;
+            if (f >= 0 && f < 8 && r >= 1 && r <= 8) {
+                if (isEnemyPieceAt(target, piece.color)) {
+                    moves.captures.push(target);
+                }
+                // en‑passant
+                if (gameState.enPassantTarget === target) {
+                    moves.enPassant = target;
+                }
+            }
+        }
+
+        return moves;
+    }
+
+    // --- LÓGICA PARA CABALLO ---
+    if (piece.type === 'knight') {
+        const [file, rank] = position.split('');
+        const fileIdx = file.charCodeAt(0) - 97;
+        const rankNum = parseInt(rank, 10);
+        
+        // Movimientos en forma de L (8 posibles)
+        const deltas = [
+            { df: 1, dr: 2 }, { df: 2, dr: 1 },
+            { df: 2, dr: -1 }, { df: 1, dr: -2 },
+            { df: -1, dr: -2 }, { df: -2, dr: -1 },
+            { df: -2, dr: 1 }, { df: -1, dr: 2 }
+        ];
+        
+        for (let {df, dr} of deltas) {
+            const f = fileIdx + df;
+            const r = rankNum + dr;
+            
+            if (f >= 0 && f < 8 && r >= 1 && r <= 8) {
+                const target = `${String.fromCharCode(97 + f)}${r}`;
+                
+                if (!isPieceAt(target)) {
+                    moves.regular.push(target);
+                } else if (isEnemyPieceAt(target, piece.color)) {
+                    moves.captures.push(target);
+                }
+            }
+        }
+        
+        return moves;
+    }
+
+    // --- LÓGICA PARA ALFIL ---
+    if (piece.type === 'bishop') {
+        const [file, rank] = position.split('');
+        const fileIdx = file.charCodeAt(0) - 97;
+        const rankNum = parseInt(rank, 10);
+        
+        // 4 direcciones diagonales
+        const deltas = [
+            { df: 1, dr: 1 },   // Diagonal superior derecha
+            { df: 1, dr: -1 },  // Diagonal inferior derecha
+            { df: -1, dr: 1 },  // Diagonal superior izquierda
+            { df: -1, dr: -1 }, // Diagonal inferior izquierda
+        ];
+        
+        for (let {df, dr} of deltas) {
+            let f = fileIdx + df;
+            let r = rankNum + dr;
+            
+            // Avanza en la dirección hasta chocar
+            while (f >= 0 && f < 8 && r >= 1 && r <= 8) {
+                const target = `${String.fromCharCode(97 + f)}${r}`;
+                
+                if (!isPieceAt(target)) {
+                    moves.regular.push(target);
+                } else {
+                    // Si es enemiga, capturar; si propia, bloqueo
+                    if (gameState.board[target].color !== piece.color) {
+                        moves.captures.push(target);
+                    }
+                    break;
+                }
+                
+                f += df;
+                r += dr;
+            }
+        }
+        
+        return moves;
+    }
+
+    // --- LÓGICA PARA REINA ---
+    if (piece.type === 'queen') {
+        const [file, rank] = position.split('');
+        const fileIdx = file.charCodeAt(0) - 97;
+        const rankNum = parseInt(rank, 10);
+        
+        // 8 direcciones (combinación de torre y alfil)
+        const deltas = [
+            { df: 1, dr: 0 },  // Este
+            { df: -1, dr: 0 }, // Oeste
+            { df: 0, dr: 1 },  // Norte
+            { df: 0, dr: -1 }, // Sur
+            { df: 1, dr: 1 },  // Noreste
+            { df: 1, dr: -1 }, // Sureste
+            { df: -1, dr: 1 }, // Noroeste
+            { df: -1, dr: -1 } // Suroeste
+        ];
+        
+        for (let {df, dr} of deltas) {
+            let f = fileIdx + df;
+            let r = rankNum + dr;
+            
+            // Avanza en la dirección hasta chocar
+            while (f >= 0 && f < 8 && r >= 1 && r <= 8) {
+                const target = `${String.fromCharCode(97 + f)}${r}`;
+                
+                if (!isPieceAt(target)) {
+                    moves.regular.push(target);
+                } else {
+                    // Si es enemiga, capturar; si propia, bloqueo
+                    if (gameState.board[target].color !== piece.color) {
+                        moves.captures.push(target);
+                    }
+                    break;
+                }
+                
+                f += df;
+                r += dr;
+            }
+        }
+        
+        return moves;
+    }
+
+    // --- LÓGICA PARA TORRES ---
+    if (piece.type === 'rook') {
+        const [file, rank] = position.split('');
+        const fileIdx = file.charCodeAt(0) - 97;
+        const rankNum = parseInt(rank, 10);
+
+        // 4 direcciones ortogonales
+        const deltas = [
+            { df:  1, dr:  0 }, // Este
+            { df: -1, dr:  0 }, // Oeste
+            { df:  0, dr:  1 }, // Norte
+            { df:  0, dr: -1 }  // Sur
+        ];
+
+        for (let {df, dr} of deltas) {
+            let f = fileIdx + df;
+            let r = rankNum + dr;
+
+            while (f >= 0 && f < 8 && r >= 1 && r <= 8) {
+                const target = `${String.fromCharCode(97 + f)}${r}`;
+                if (!isPieceAt(target)) {
+                    moves.regular.push(target);
+                } else {
+                    if (gameState.board[target].color !== piece.color) {
+                        moves.captures.push(target);
+                    }
+                    break; // bloqueo tras chocar con cualquier pieza
+                }
+                f += df;
+                r += dr;
+            }
+        }
+        return moves;
+    }
+
+    // --- LÓGICA PARA REY ---
+    if (piece.type === 'king') {
+        const [file, rank] = position.split('');
+        const fileIdx = file.charCodeAt(0) - 97;
+        const rankNum = parseInt(rank, 10);
+        
+        // El rey se mueve una casilla en cualquier dirección (8 direcciones)
+        const deltas = [
+            { df:  1, dr:  0 }, { df: -1, dr:  0 },
+            { df:  0, dr:  1 }, { df:  0, dr: -1 },
+            { df:  1, dr:  1 }, { df:  1, dr: -1 },
+            { df: -1, dr:  1 }, { df: -1, dr: -1 }
+        ];
+        
+        for (let {df, dr} of deltas) {
+            const f = fileIdx + df;
+            const r = rankNum + dr;
+            
+            if (f >= 0 && f < 8 && r >= 1 && r <= 8) {
+                const target = `${String.fromCharCode(97 + f)}${r}`;
+                
+                if (!isPieceAt(target)) {
+                    moves.regular.push(target);
+                } else if (isEnemyPieceAt(target, piece.color)) {
+                    moves.captures.push(target);
+                }
+            }
+        }
+
+        // Enroque - verificar condiciones
+        if (!piece.hasMoved  ) {
+            // Enroque corto (lado rey)
+            const kingsideRook = gameState.board[piece.color === 'white' ? 'h1' : 'h8'];
+            if (kingsideRook && kingsideRook.type === 'rook' && !kingsideRook.hasMoved) {
+                const rank = piece.color === 'white' ? '1' : '8';
+                // Verificar que las casillas entre rey y torre estén vacías
+                if (!isPieceAt(`f${rank}`) && !isPieceAt(`g${rank}`)) {
+                    // Añadir movimiento de enroque (dos casillas a la derecha)
+                    moves.regular.push(`g${rank}`);
+                }
+            }
+            
+            // Enroque largo (lado dama)
+            const queensideRook = gameState.board[piece.color === 'white' ? 'a1' : 'a8'];
+            if (queensideRook && queensideRook.type === 'rook' && !queensideRook.hasMoved) {
+                const rank = piece.color === 'white' ? '1' : '8';
+                // Verificar que las casillas entre rey y torre estén vacías
+                if (!isPieceAt(`b${rank}`) && !isPieceAt(`c${rank}`) && !isPieceAt(`d${rank}`)) {
+                    // Añadir movimiento de enroque (dos casillas a la izquierda)
+                    moves.regular.push(`c${rank}`);
+                }
+            }
+        }
+        
+        return moves;
+    }
+
+    return moves;
+}
+
+                // Función para encontrar la posición del rey de un color determinado
+                function findKingPosition(color) {
+                    for (let pos in gameState.board) {
+                        const piece = gameState.board[pos];
+                        if (piece && piece.type === 'king' && piece.color === color) {
+                            return pos;
+                        }
+                    }
+                    return null;
+                }
+
+                function getValidMovesConsideringCheck(position) {
+                    const piece = gameState.board[position];
+                    if (!piece) return { regular: [], captures: [], enPassant: null };
+                    
+                    const regularMoves = getValidMoves(position);
+                    const filteredMoves = { regular: [], captures: [], enPassant: null };
+                    
+                    // Filtrar movimientos regulares
+                    for (const movePos of regularMoves.regular) {
+                        if (!doesMoveExposeKingToCheck(position, movePos, piece.color)) {
+                            filteredMoves.regular.push(movePos);
+                        }
+                    }
+                    
+                    // Filtrar capturas
+                    for (const capturePos of regularMoves.captures) {
+                        if (!doesMoveExposeKingToCheck(position, capturePos, piece.color)) {
+                            filteredMoves.captures.push(capturePos);
+                        }
+                    }
+                    
+                    // Filtrar captura al paso
+                    if (regularMoves.enPassant && !doesMoveExposeKingToCheck(position, regularMoves.enPassant, piece.color)) {
+                        filteredMoves.enPassant = regularMoves.enPassant;
+                    }
+                    
+                    return filteredMoves;
+                }
+
+                function checkForCheckOrCheckmateStatus() {
+                    const currentKingColor = gameState.currentTurn;
+                    const statusElement = document.getElementById('status');
+                    
+                    // Eliminar resaltados anteriores
+                    document.querySelectorAll('.king-in-check').forEach(cell => {
+                        cell.classList.remove('king-in-check');
+                    });
+                    
+                    if (isKingInCheck(currentKingColor)) {
+                        // Resaltar el rey en jaque
+                        highlightKingInCheck(currentKingColor);
+                        
+                        if (isCheckmate(currentKingColor)) {
+                            statusElement.textContent = `¡JAQUE MATE! ${currentKingColor === 'white' ? 'Negras' : 'Blancas'} ganan`;
+                            statusElement.style.color = 'red';
+                            statusElement.classList.add('checkmate');
+                            gameState.gameOver = true;
+                        } else {
+                            statusElement.textContent = `¡JAQUE! Turno de: ${currentKingColor === 'white' ? 'Blancas' : 'Negras'}`;
+                            statusElement.style.color = 'orange';
+                            statusElement.classList.remove('checkmate');
+                        }
+                    } else {
+                        statusElement.textContent = `Turno de: ${currentKingColor === 'white' ? 'Blancas' : 'Negras'}`;
+                        statusElement.style.color = '';
+                        statusElement.classList.remove('checkmate');
+                    }
+                }
+
+                // Función para verificar si una posición está bajo ataque por el color enemigo
+                function isPositionUnderAttack(position, attackingColor) {
+                    // Guarda el estado actual del tablero
+                    const originalBoard = JSON.parse(JSON.stringify(gameState.board));
+                    
+                    // Verificar si alguna pieza enemiga puede capturar en esta posición
+                    for (let pos in gameState.board) {
+                        const piece = gameState.board[pos];
+                        if (piece && piece.color === attackingColor) {
+                            const moves = getValidMoves(pos);
+                            if (moves.captures.includes(position) || 
+                                (piece.type === 'pawn' && moves.enPassant === position)) {
+                                return true;
+                            }
+                        }
+                    }
+                    return false;
+                }
+
+                // Función para verificar si un rey está en jaque
+                function isKingInCheck(kingColor) {
+                    const enemyColor = kingColor === 'white' ? 'black' : 'white';
+                    const kingPosition = findKingPosition(kingColor);
+                    
+                    if (!kingPosition) return false; // No hay rey (esto no debería pasar en un juego normal)
+                    
+                    return isPositionUnderAttack(kingPosition, enemyColor);
+                }
+
+                // Función para comprobar si un movimiento deja al rey propio en jaque (movimiento inválido)
+                function doesMoveExposeKingToCheck(fromPos, toPos, kingColor) {
+                    // Guarda el estado actual del tablero
+                    const originalBoard = JSON.parse(JSON.stringify(gameState.board));
+                    const piece = originalBoard[fromPos];
+                    
+                    if (!piece) return false;
+                    
+                    // Simular el movimiento
+                    const capturedPiece = originalBoard[toPos];
+                    originalBoard[toPos] = piece;
+                    delete originalBoard[fromPos];
+                    
+                    // Reemplazar temporalmente el tablero real con el simulado
+                    const tempBoard = gameState.board;
+                    gameState.board = originalBoard;
+                    
+                    // Verificar si el rey está en jaque tras el movimiento
+                    const enemyColor = kingColor === 'white' ? 'black' : 'white';
+                    const kingPosition = findKingPosition(kingColor);
+                    const inCheck = isPositionUnderAttack(kingPosition, enemyColor);
+                    
+                    // Restaurar el tablero original
+                    gameState.board = tempBoard;
+                    
+                    return inCheck;
+                }
+
+                // Función para verificar si hay jaque mate
+                function isCheckmate(kingColor) {
+                    // Si el rey no está en jaque, no puede ser jaque mate
+                    if (!isKingInCheck(kingColor)) return false;
+                    
+                    // Comprobar si algún movimiento legal puede sacar al rey del jaque
+                    for (let pos in gameState.board) {
+                        const piece = gameState.board[pos];
+                        if (piece && piece.color === kingColor) {
+                            const moves = getValidMoves(pos);
+                            
+                            // Verificar movimientos regulares
+                            for (const movePos of moves.regular) {
+                                if (!doesMoveExposeKingToCheck(pos, movePos, kingColor)) {
+                                    return false; // Hay al menos un movimiento que evita el jaque
+                                }
+                            }
+                            
+                            // Verificar capturas
+                            for (const capturePos of moves.captures) {
+                                if (!doesMoveExposeKingToCheck(pos, capturePos, kingColor)) {
+                                    return false; // Hay al menos una captura que evita el jaque
+                                }
+                            }
+                            
+                            // Verificar captura al paso
+                            if (moves.enPassant && !doesMoveExposeKingToCheck(pos, moves.enPassant, kingColor)) {
+                                return false; // Una captura al paso puede evitar el jaque
+                            }
+                        }
+                    }
+                    
+                    // Si llegamos aquí, ningún movimiento puede salvar al rey
+                    return true;
+                }
+
+                // Funciones auxiliares para mejorar la legibilidad
+                function isPieceAt(position) {
+                    return !!gameState.board[position];
+                }
+                
+                function isEnemyPieceAt(position, myColor) {
+                    const piece = gameState.board[position];
+                    return piece && piece.color !== myColor;
+                }
+                
+                function isValidPosition(position) {
+                    if (!position || position.length !== 2) return false;
+                    
+                    const [file, rank] = position.split('');
+                    const fileValid = file >= 'a' && file <= 'h';
+                    const rankValid = parseInt(rank) >= 1 && parseInt(rank) <= 8;
+                    
+                    return fileValid && rankValid;
+                }
+                
+                function highlightValidMoves(position) {
+                    const validMoves = getValidMovesConsideringCheck(position);
+                    
+                    // Resaltar movimientos regulares
+                    validMoves.regular.forEach(move => {
+                        const cell = document.getElementById(move);
+                        cell.querySelector('.valid-move').style.display = 'block';
+                    });
+                    
+                    // Resaltar capturas normales
+                    validMoves.captures.forEach(move => {
+                        const cell = document.getElementById(move);
+                        cell.querySelector('.capture-move').style.display = 'block';
+                    });
+                    
+                    // Resaltar captura al paso si existe
+                    if (validMoves.enPassant) {
+                        const cell = document.getElementById(validMoves.enPassant);
+                        cell.querySelector('.capture-move').style.display = 'block';
+                    }
+                }
+                
+                function clearHighlights() {
+                    document.querySelectorAll('.valid-move, .capture-move').forEach(elem => {
+                        elem.style.display = 'none';
+                    });
+                    
+                    // También limpiar el resaltado de la última jugada
+                    document.querySelectorAll('.last-move').forEach(elem => {
+                        elem.parentNode.removeChild(elem);
+                    });
+                }
+                
+                function movePiece(fromPos, toPos) {
+                    const piece = gameState.board[fromPos];
+                    if (!piece) return false;
+
+                    // ——— Captura normal: si hay pieza enemiga en toPos, elimínala ———
+                    if (gameState.board[toPos] ) {
+                        // Estado
+                        delete gameState.board[toPos];
+                        // DOM
+                        const capCell = document.getElementById(toPos);
+                        const capPiece = capCell.querySelector('.piece');
+                        if (capPiece) capCell.removeChild(capPiece);
+                    }
+
+                    // ——— Mueve tu peón ———
+                    piece.hasMoved = true;
+                    delete gameState.board[fromPos];
+                    gameState.board[toPos] = piece;
+
+                    // DOM: quita la pieza de origen y la pones en destino
+                    const fromCell = document.getElementById(fromPos);
+                    const toCell   = document.getElementById(toPos);
+                    const pieceElem = fromCell.querySelector('.piece');
+                    if (pieceElem) {
+                        fromCell.removeChild(pieceElem);
+                        toCell.appendChild(pieceElem);
+                    }
+                    
+                    // Manejar enroque
+                    if (piece.type === 'king' && Math.abs(fromPos.charCodeAt(0) - toPos.charCodeAt(0)) > 1) {
+                        // Es un movimiento de enroque
+                        const rank = piece.color === 'white' ? '1' : '8';
+                        
+                        // Enroque corto (hacia la columna g)
+                        if (toPos === `g${rank}`) {
+                            const rookFrom = `h${rank}`;
+                            const rookTo = `f${rank}`;
+                            // Mover la torre
+                            const rook = gameState.board[rookFrom];
+                            delete gameState.board[rookFrom];
+                            gameState.board[rookTo] = rook;
+                            
+                            // Actualizar DOM para la torre
+                            const rookFromCell = document.getElementById(rookFrom);
+                            const rookToCell = document.getElementById(rookTo);
+                            const rookPiece = rookFromCell.querySelector('.piece');
+                            if (rookPiece) {
+                                rookFromCell.removeChild(rookPiece);
+                                rookToCell.appendChild(rookPiece);
+                            }
+                        }
+                        // Enroque largo (hacia la columna c)
+                        else if (toPos === `c${rank}`) {
+                            const rookFrom = `a${rank}`;
+                            const rookTo = `d${rank}`;
+                            // Mover la torre
+                            const rook = gameState.board[rookFrom];
+                            delete gameState.board[rookFrom];
+                            gameState.board[rookTo] = rook;
+                            
+                            // Actualizar DOM para la torre
+                            const rookFromCell = document.getElementById(rookFrom);
+                            const rookToCell = document.getElementById(rookTo);
+                            const rookPiece = rookFromCell.querySelector('.piece');
+                            if (rookPiece) {
+                                rookFromCell.removeChild(rookPiece);
+                                rookToCell.appendChild(rookPiece);
+                            }
+                        }
+                    }
+                    // Registro de última jugada, promoción, turnos, etc.
+                    gameState.lastMove = { from: fromPos, to: toPos, piece };
+                    updateEnPassantTarget(toPos);
+                    updateLastMoveHighlight(toPos);
+
+                    // Si llegó a la fila 1 u 8, lanzar promoción
+                    const rank = toPos.charAt(1);
+                    if (piece.type === 'pawn' && (rank === '8' || rank === '1')) {
+                        gameState.pendingPromotion = toPos;
+                        showPromotionOptions(piece.color, toPos);
+                    } 
+
+                    if (gameState.gameOver) {
+                        const statusElement = document.getElementById('status');
+                        statusElement.style.color = 'red';
+                    }
+                        return true;
+                    }
+
+                  
+                    
+
+
+
+                // Completar updateEnPassantTarget (se quedó cortado)
+                function updateEnPassantTarget(toPos) {
+                    gameState.enPassantTarget = null;
+                    if (!gameState.lastMove || gameState.lastMove.piece.type !== 'pawn') return;
+                    const fromRank = parseInt(gameState.lastMove.from.charAt(1));
+                    const toRank   = parseInt(gameState.lastMove.to.charAt(1));
+                    const file     = gameState.lastMove.to.charAt(0);
+                    // Si avanzó dos casillas, marca el target para en passant
+                    if (Math.abs(toRank - fromRank) === 2) {
+                        const middleRank = (fromRank + toRank) / 2;
+                        gameState.enPassantTarget = `${file}${middleRank}`;
+                    }
+                }
+
+                // Ejecución de la captura al paso
+                function executeEnPassantCapture(fromPos, toPos) {
+                    const movingPawn = gameState.board[fromPos];
+                    const [file, rank] = toPos.split('');
+                    // El peón capturado está en la misma fila de origen
+                    const capturedPos = file + fromPos.charAt(1);
+                    // Elimina el peón capturado del estado y del DOM
+                    delete gameState.board[capturedPos];
+                    const capCell = document.getElementById(capturedPos);
+                    const capPiece = capCell.querySelector('.piece');
+                    if (capPiece) capCell.removeChild(capPiece);
+                    // Ahora mueve el tuyo normalmente
+                    movePiece(fromPos, toPos);
+                }
+
+                // Resalta la última jugada (origen y destino)
+                function updateLastMoveHighlight(toPos) {
+                    if (!gameState.lastMove) return;
+                    const { from, to } = gameState.lastMove;
+                    [from, to].forEach(pos => {
+                        const cell = document.getElementById(pos);
+                        const mark = document.createElement('div');
+                        mark.className = 'last-move';
+                        cell.appendChild(mark);
+                    });
+                }
+
+                // Muestra el modal de promoción y solo ofrece reina
+                function showPromotionOptions(color, pos) {
+                    const modal = document.getElementById('promotion-modal');
+                    const container = document.getElementById('promotion-options');
+                    container.innerHTML = '';
+                    
+                    // Opciones de promoción: Dama, Torre, Alfil, Caballo
+                    const pieces = [
+                        { type: 'queen', symbol: color === 'white' ? '♕' : '♛' },
+                        { type: 'rook', symbol: color === 'white' ? '♖' : '♜' },
+                        { type: 'bishop', symbol: color === 'white' ? '♗' : '♝' },
+                        { type: 'knight', symbol: color === 'white' ? '♘' : '♞' }
+                    ];
+                    
+                    pieces.forEach(p => {
+                        const option = document.createElement('div');
+                        option.className = 'promotion-option';
+                        option.textContent = p.symbol;
+                        option.addEventListener('click', () => handlePromotion(pos, p.type));
+                        container.appendChild(option);
+                    });
+                    
+                    modal.style.display = 'flex';
+                }
+
+                function highlightKingInCheck(kingColor) {
+                    // Primero quita cualquier resaltado previo
+                    document.querySelectorAll('.king-in-check').forEach(cell => {
+                        cell.classList.remove('king-in-check');
+                    });
+                    
+                    // Si hay jaque, resalta la posición del rey
+                    if (isKingInCheck(kingColor)) {
+                        const kingPosition = findKingPosition(kingColor);
+                        if (kingPosition) {
+                            const kingCell = document.getElementById(kingPosition);
+                            kingCell.classList.add('king-in-check');
+                        }
+                    }
+                }
+
+                // También actualiza handlePromotion para manejar todos los tipos
+                function handlePromotion(pos, newType) {
+                    const piece = gameState.board[pos];
+                    piece.type = newType;
+                    
+                    // Actualizar DOM: cambiar el símbolo según la pieza elegida
+                    const cell = document.getElementById(pos);
+                    const old = cell.querySelector('.piece');
+                    if (old) cell.removeChild(old);
+                    
+                    // Determinar el símbolo correspondiente
+                    let symbol = '';
+                    if (newType === 'queen') {
+                        symbol = piece.color === 'white' ? '♕' : '♛';
+                    } else if (newType === 'rook') {
+                        symbol = piece.color === 'white' ? '♖' : '♜';
+                    } else if (newType === 'bishop') {
+                        symbol = piece.color === 'white' ? '♗' : '♝';
+                    } else if (newType === 'knight') {
+                        symbol = piece.color === 'white' ? '♘' : '♞';
+                    }
+                    
+                    const span = document.createElement('span');
+                    span.className = 'piece';
+                    span.dataset.piece = `${piece.color}-${newType}`;
+                    span.textContent = symbol;
+                    cell.insertBefore(span, cell.firstChild);
+                    
+                    // Resto del código de promoción...
+                    gameState.pendingPromotion = null;
+                    document.getElementById('promotion-modal').style.display = 'none';
+                    gameState.currentTurn = gameState.currentTurn === 'white' ? 'black' : 'white';
+                    updateStatus();
+                }
+
+                // Reinicia todo el tablero
+                function resetBoard() {
+                    // Limpia DOM
+                    document.querySelectorAll('.piece').forEach(el => el.remove());
+                    clearHighlights();
+                    // Resetea estado
+                    gameState.currentTurn = 'white';
+                    gameState.lastMove = null;
+                    gameState.enPassantTarget = null;
+                    gameState.pendingPromotion = null;
+                    initBoard();
+                    // Re-dibuja peones en su posición inicial
+                    for (let pos in gameState.board) {
+                        const cell  = document.getElementById(pos);
+                        const piece = gameState.board[pos];
+                        const span  = document.createElement('span');
+                        span.className = 'piece';
+                        span.dataset.piece = `${piece.color}-${piece.type}`;
+                        // El símbolo Unicode:
+                        // Dentro de la función resetBoard, en el bloque donde se asignan los símbolos Unicode
+                        if (piece.type === 'pawn') {
+                            span.textContent = piece.color === 'white' ? '♙' : '♟';
+                        } else if (piece.type === 'rook') {
+                            span.textContent = piece.color === 'white' ? '♖' : '♜';
+                        } else if (piece.type === 'knight') {
+                            span.textContent = piece.color === 'white' ? '♘' : '♞';
+                        } else if (piece.type === 'bishop') {
+                            span.textContent = piece.color === 'white' ? '♗' : '♝';
+                        } else if (piece.type === 'queen') {
+                            span.textContent = piece.color === 'white' ? '♕' : '♛';
+                        } else if (piece.type === 'king') {
+                            span.textContent = piece.color === 'white' ? '♔' : '♚';
+                        }
+                        cell.appendChild(span);
+                    }
+                    
+                    // Limpiar clases de jaque
+                    document.querySelectorAll('.king-in-check').forEach(cell => {
+                        cell.classList.remove('king-in-check');
+                    });
+                    
+                    const statusElement = document.getElementById('status');
+                    statusElement.classList.remove('checkmate');
+                    statusElement.style.color = '';
+                                    gameState.gameOver = false;
+
+                    updateStatus();
+                }
+
+                // Alterna turno manualmente (útil para pruebas)
+                function toggleTurn() {
+                    gameState.currentTurn =
+                        gameState.currentTurn === 'white' ? 'black' : 'white';
+                    updateStatus();
+                }
+
+                // Muestra en pantalla de quién es el turno
+                function updateStatus() {
+                    checkForCheckOrCheckmateStatus();
+                }
+
+            }); // FIN DOMContentLoaded
+</script>
+
+<style>
+/* Estilo Punk para Ajedrez - "CHIMBA GONORREA CHESS" */
+
+/* Importar fuentes estilo punk/graffiti */
+@import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Creepster&display=swap');
+
+/* Fondo general con textura áspera */
+body {
+    background-color: #121212;
+    background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%232a2a2a' fill-opacity='0.3' fill-rule='evenodd'/%3E%3C/svg%3E");
+    color: #ff0066;
+    font-family: 'Permanent Marker', cursive;
+    text-shadow: 2px 2px 0px #000;
+    padding: 20px;
+}
+
+/* Contenedor principal con borde roto */
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    background-color: #1a1a1a;
+    border: 8px solid transparent;
+    border-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23ff0066' fill-opacity='1' fill-rule='evenodd'/%3E%3C/svg%3E") 30 stretch;
+    padding: 20px;
+    box-shadow: 0 0 20px #ff0066, 0 0 40px rgba(255, 0, 102, 0.3);
+}
+
+/* Título principal estilo punk */
+h1 {
+    font-family: 'Creepster', cursive;
+    font-size: 48px;
+    text-align: center;
+    color: #ff0066;
+    text-transform: uppercase;
+    margin-bottom: 30px;
+    letter-spacing: 2px;
+    text-shadow: 
+        0 0 5px #ff0066,
+        3px 3px 0 #000,
+        -3px -3px 0 #000;
+    transform: skewY(-1deg);
+    position: relative;
+}
+
+h1:before {
+    content: "CHESS";
+    position: absolute;
+    top: -15px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 18px;
+    color: #00ffcc;
+    letter-spacing: 10px;
+    text-shadow: 0 0 8px #00ffcc;
+    opacity: 0.7;
+}
+
+h1:after {
+    content: "DanyCC";
+    position: absolute;
+    bottom: -15px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 18px;
+    color: #00ffcc;
+    letter-spacing: 10px;
+    text-shadow: 0 0 8px #00ffcc;
+    opacity: 0.7;
+}
+
+/* Instrucciones estilo punk */
+.instructions {
+    background-color: #1a1a1a;
+    border: 2px solid #ff0066;
+    border-radius: 5px;
+    padding: 15px;
+    margin-bottom: 20px;
+    font-family: 'Permanent Marker', cursive;
+    color: #00ffcc;
+    box-shadow: inset 0 0 10px rgba(0, 255, 204, 0.5);
+}
+
+.instructions p {
+    margin-top: 0;
+    font-size: 20px;
+    text-transform: uppercase;
+    color: #ff0066;
+}
+
+.instructions ul {
+    margin-left: 20px;
+    padding-left: 0;
+}
+
+.instructions li {
+    margin-bottom: 8px;
+    list-style-type: none;
+    position: relative;
+    padding-left: 20px;
+}
+
+.instructions li:before {
+    content: "☠";
+    position: absolute;
+    left: 0;
+    color: #ff0066;
+}
+
+/* Tablero de ajedrez estilo punk */
+.chess-board {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0 auto;
+    border: 4px solid #ff0066;
+    box-shadow: 0 0 15px #ff0066;
+    background-color: #1a1a1a;
+    position: relative;
+    z-index: 1;
+}
+
+.chess-board th {
+    padding: 5px;
+    color: #00ffcc;
+    font-size: 18px;
+    text-shadow: 0 0 5px #0fc;
+}
+
+.chess-board td {
+    width: 12.5%;
+    height: 60px;
+    position: relative;
+    transition: all 0.3s;
+}
+
+/* Casillas estilo punk */
+.light {
+    background-color: #2a2a2a;
+    background-image: url("data:image/svg+xml,%3Csvg width='6' height='6' viewBox='0 0 6 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23353535' fill-opacity='0.4' fill-rule='evenodd'%3E%3Cpath d='M5 0h1L0 5v1H5V0zm1 5v1H5v-1h1z'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+.dark {
+    background-color: #151515;
+    background-image: url("data:image/svg+xml,%3Csvg width='6' height='6' viewBox='0 0 6 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23000000' fill-opacity='0.4' fill-rule='evenodd'%3E%3Cpath d='M5 0h1L0 5v1H5V0zm1 5v1H5v-1h1z'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* Piezas de ajedrez estilo punk */
+.piece {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    font-size: 40px;
+    cursor: pointer;
+    z-index: 2;
+    position: absolute;
+    top: 0;
+    left: 0;
+    transition: all 0.2s;
+}
+
+/* Colores de piezas estilo punk */
+[data-piece^="white"] {
+    color: #2600ff;
+    text-shadow: 0 0 8px rgba(0, 255, 204, 0.7);
+}
+
+[data-piece^="black"] {
+    color: #ff0066;
+    text-shadow: 0 0 8px rgba(255, 0, 102, 0.7);
+}
+
+/* Efectos hover para piezas */
+.piece:hover {
+    transform: scale(1.2);
+}
+
+/* Indicadores de movimiento estilo punk */
+.valid-move {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 20px;
+    height: 20px;
+    background-color: #00ffcc;
+    border-radius: 50%;
+    opacity: 0.8;
+    box-shadow: 0 0 10px #00ffcc;
+    z-index: 1;
+}
+
+.capture-move {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: 3px solid #ff0066;
+    box-sizing: border-box;
+    z-index: 1;
+    opacity: 0.8;
+    box-shadow: inset 0 0 10px #ff0066;
+}
+
+/* Última jugada estilo punk */
+.last-move {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 0, 0.2);
+    z-index: 0;
+    box-shadow: inset 0 0 8px rgba(255, 255, 0, 0.5);
+}
+
+/* Rey en jaque estilo punk */
+.king-in-check {
+    animation: pulse 0.6s infinite alternate;
+    background-color: rgba(255, 0, 0, 0.2) !important;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: inset 0 0 10px rgba(255, 0, 0, 0.5);
+    }
+    100% {
+        box-shadow: inset 0 0 20px rgba(255, 0, 0, 0.8);
+    }
+}
+
+/* Status estilo punk */
+.status {
+    margin: 20px 0;
+    padding: 10px;
+    text-align: center;
+    font-size: 24px;
+    color: #00ffcc;
+    font-family: 'Permanent Marker', cursive;
+    text-transform: uppercase;
+    background-color: #1a1a1a;
+    border: 2px solid #00ffcc;
+    box-shadow: 0 0 10px rgba(0, 255, 204, 0.5);
+    text-shadow: 1px 1px 0 #000;
+}
+
+/* Clase especial para jaque mate */
+.checkmate {
+    animation: glitch 0.3s infinite;
+    letter-spacing: 3px;
+}
+
+@keyframes glitch {
+    0% {
+        text-shadow: 2px 0 0 red, -2px 0 0 blue;
+    }
+    25% {
+        text-shadow: -2px 0 0 red, 2px 0 0 blue;
+    }
+    50% {
+        text-shadow: 2px 0 0 red, -2px 0 0 blue;
+    }
+    75% {
+        text-shadow: -2px 0 0 red, 2px 0 0 blue;
+    }
+    100% {
+        text-shadow: 2px 0 0 red, -2px 0 0 blue;
+    }
+}
+
+/* Botones estilo punk */
+.controls {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.controls button {
+    background-color: #1a1a1a;
+    border: 2px solid #ff0066;
+    color: #ff0066;
+    padding: 10px 20px;
+    font-family: 'Permanent Marker', cursive;
+    font-size: 16px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+    border-radius: 0;
+}
+
+.controls button:before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 0, 102, 0.3), transparent);
+    transition: all 0.5s;
+}
+
+.controls button:hover {
+    background-color: #2a2a2a;
+    color: #00ffcc;
+    border-color: #00ffcc;
+    box-shadow: 0 0 10px rgba(0, 255, 204, 0.7);
+    transform: translateY(-3px);
+}
+
+.controls button:hover:before {
+    left: 100%;
+}
+
+.controls button:active {
+    transform: translateY(1px);
+}
+
+/* Modal de promoción estilo punk */
+.promotion-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+}
+
+.promotion-content {
+    background-color: #1a1a1a;
+    border: 4px solid #ff0066;
+    padding: 20px;
+    text-align: center;
+    position: relative;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: 0 0 20px #ff0066;
+}
+
+.promotion-content:before {
+    content: "";
+    position: absolute;
+    top: -10px;
+    left: -10px;
+    right: -10px;
+    bottom: -10px;
+    border: 2px solid #00ffcc;
+    z-index: -1;
+    pointer-events: none;
+}
+
+.promotion-content h2 {
+    color: #00ffcc;
+    font-family: 'Permanent Marker', cursive;
+    margin-top: 0;
+    text-transform: uppercase;
+    font-size: 24px;
+    letter-spacing: 1px;
+    text-shadow: 2px 2px 0 #000;
+}
+
+.promotion-options {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.promotion-option {
+    width: 60px;
+    height: 60px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #2a2a2a;
+    border: 2px solid #ff0066;
+    font-size: 40px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.promotion-option:hover {
+    transform: scale(1.2);
+    box-shadow: 0 0 10px #ff0066;
+}
+
+/* Efectos generales adicionales */
+@keyframes bg-shift {
+    0% {
+        background-position: 0% 0%;
+    }
+    100% {
+        background-position: 100% 100%;
+    }
+}
+
+body {
+    animation: bg-shift 60s linear infinite alternate;
+    background-size: 200px 200px;
+}
+
+/* Efectos especiales */
+.chess-board:after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(45deg, rgba(255,0,102,0.1) 0%, rgba(0,255,204,0.1) 100%);
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Adaptación para móviles */
+@media (max-width: 768px) {
+    h1 {
+        font-size: 32px;
+    }
+    
+    .chess-board td {
+        height: 40px;
+    }
+    
+    .piece {
+        font-size: 30px;
+    }
+    
+    .instructions {
+        font-size: 14px;
+    }
+    
+    .controls {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .promotion-option {
+        width: 40px;
+        height: 40px;
+        font-size: 30px;
+    }
+}
+</style>
+
+
+    </body>
+</html>
